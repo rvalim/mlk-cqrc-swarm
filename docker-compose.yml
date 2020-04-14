@@ -1,0 +1,249 @@
+version: '3.5'
+
+services:
+  mlk-gateway:
+    hostname: mlk-gateway
+    image: mlk-cqrc/mlk-gateway:stable
+    container_name: 'mlk-gateway'
+    volumes:
+    - ./services/mlk-file:/files
+    restart: always
+    ports:
+    - "8085:8081"
+    depends_on:
+    - mlk-auth
+    networks:
+    - front
+    - back
+    environment:
+      JWT_VALIDATE_URL: http://mlk-auth:3030/auth/validate
+      AUTH_VALIDATE_URL: http://mlk-auth:3030/access
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  mlk-calendar:
+    hostname: mlk-calendar
+    image: mlk-cqrc/mlk-calendar:stable
+    container_name: 'mlk-calendar'
+    restart: always
+    depends_on:
+    - mlk-dbcalendar
+    - mlk-redis
+    networks:
+    - back
+    env_file: 
+    - ./env/common.env
+    command:
+      bash ./scripts/run.sh
+    environment:
+      DATABASE_URL: mlk-dbcalendar
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  mlk-file:
+    hostname: mlk-file
+    image: mlk-cqrc/mlk-file:stable
+    container_name: 'mlk-file'
+    restart: always
+    depends_on:
+    - mlk-dbfile
+    - mlk-redis
+    networks:
+    - back
+    env_file: 
+    - ./env/common.env
+    command:
+      bash ./scripts/run.sh
+    environment:
+      DATABASE_URL: mlk-dbfile
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  mlk-profile:
+    hostname: mlk-profile
+    image: mlk-cqrc/mlk-profile:stable
+    container_name: 'mlk-profile'
+    restart: always
+    depends_on:
+    - mlk-dbprofile
+    - mlk-redis
+    networks:
+    - back
+    env_file: 
+    - ./env/common.env
+    command:
+      bash ./scripts/run.sh
+    environment:
+      DATABASE_URL: mlk-dbprofile
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  mlk-auth:
+    hostname: mlk-auth
+    image: mlk-cqrc/mlk-auth:stable
+    container_name: 'mlk-auth'
+    restart: always
+    depends_on:
+    - mlk-dbauth
+    - mlk-redis
+    networks:
+    - back
+    env_file: 
+    - ./env/common.env
+    command:
+      bash ./scripts/run.sh
+    environment:
+      DATABASE_URL: mlk-dbauth
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+
+  mlk-vacation:
+    hostname: mlk-vacation
+    image: mlk-cqrc/mlk-vacation:stable
+    container_name: 'mlk-vacation'
+    restart: always
+    depends_on:
+    - mlk-dbvacation
+    - mlk-redis
+    networks:
+    - back
+    env_file: 
+    - ./env/common.env
+    command:
+      bash ./scripts/run.sh
+    environment:
+      DATABASE_URL: mlk-dbvacation
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+
+  mlk-vacation-handler:
+    hostname: mlk-vacation-handler
+    image: mlk-cqrc/mlk-vacation-handler:stable
+    container_name: 'mlk-vacation-handler'
+    restart: always
+    depends_on:
+    - mlk-vacation
+    networks:
+    - back
+    env_file:
+    - ./env/common.env
+    command:
+      bash ./scripts/run.sh
+    environment:
+      PROFILE_URL: mlk-profile:3030
+      VACATION_URL: mlk-vacation:3030
+      AUTH_URL: mlk-auth:3030
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure   
+
+  mlk-dbauth:
+    image: postgres:latest
+    env_file: 
+    - ./env/postgres.env
+    restart: always
+    container_name: 'mlk-dbauth'
+    networks:
+    - back
+    hostname: mlk-dbauth
+    volumes:
+    - ./data/dbauth:/var/lib/postgresql/data/pgdata
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  mlk-dbcalendar:
+    image: postgres:latest
+    env_file: 
+    - ./env/postgres.env
+    restart: always
+    container_name: 'mlk-dbcalendar'
+    networks:
+    - back
+    hostname: mlk-dbcalendar
+    volumes:
+    - ./data/dbcalendar:/var/lib/postgresql/data/pgdata
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  mlk-dbfile:
+    image: postgres:latest
+    env_file: 
+    - ./env/postgres.env
+    restart: always
+    container_name: 'mlk-dbfile'
+    networks:
+    - back
+    hostname: mlk-dbfile
+    volumes:
+    - ./data/dbfile:/var/lib/postgresql/data/pgdata
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  mlk-dbprofile:
+    image: postgres:latest
+    env_file: 
+    - ./env/postgres.env
+    restart: always
+    container_name: 'mlk-dbprofile'
+    networks:
+    - back
+    hostname: mlk-dbprofile
+    volumes:
+    - ./data/dbprofile:/var/lib/postgresql/data/pgdata
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  mlk-dbvacation:
+    image: postgres:latest
+    env_file: 
+    - ./env/postgres.env
+    restart: always
+    container_name: 'mlk-dbvacation'
+    networks:
+    - back
+    hostname: mlk-dbvacation
+    volumes:
+    - ./data/dbvacation:/var/lib/postgresql/data/pgdata
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  mlk-redis:
+    image: redis:alpine
+    restart: always
+    container_name: 'mlk-redis'
+    networks:
+    - back
+    hostname: mlk-redis
+    ports:
+    - "6379"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+networks:
+  front:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 172.16.238.0/24
+  back:
+    driver: bridge
